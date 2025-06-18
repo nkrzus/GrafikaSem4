@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Textures and Texture Transforms</title>
+<link rel="stylesheet" href="../demo.css">
+<style>
+#texcanvas {
+    background-image: url("textures/NightEarth-512x256.jpg");
+    background-size: 100px 100px;
+}
+</style>
+<script src="../script/demo-core.js"></script>
+<script src="../script/glsim.js"></script>
+<script src="../script/teapot-model-IFS.js"></script>
+<script src="../script/basic-object-models-IFS.js"></script>
+<script src="../script/slider-canvas.js"></script>
+<script>
+
+var camera;
+var graphics;
+var frameNumber = 0;
+var sphere, cubeModel, cylinder, cone, torus, teapot, Pyramid17;
+var sliderScale, sliderTranslateX, sliderTranslateY, sliderRotate;
+var scale = 1, translateX = 0, translateY = 0, rotate = 0;
+var loadingImages = true;
+var textureImages = [];
+var textureImageURLs = [
+    "textures/brick001.jpg",
+    "textures/Earth-1024x512.jpg",
+    "textures/NightEarth-512x256.jpg",
+    "textures/marble.jpg",
+    "textures/metal003.gif",
+    "textures/clouds.jpg",
+];
+
+function createPyramid17() {
+    var model = {};
+    var base = 17;           
+    var radius = 1;
+    var height = 1.5;
+    var angleStep = 2 * Math.PI / base;
+    var verts = [[0, height, 0]]; 
+    for (var i = 0; i < base; i++) {
+        let angle = i * angleStep;
+        verts.push([radius * Math.cos(angle), 0, radius * Math.sin(angle)]);
+    }
+    var texCoords = [[0.5, 1.0]]; 
+    for (var i = 0; i < base; i++) {
+        texCoords.push([i / base, 0.0]);
+    }
+    verts.push([0, 0, 0]); 
+    texCoords.push([0.5, 0.5]);
+    var indices = [];
+    for (var i = 1; i <= base; i++) {
+        var next = i % base + 1;
+        indices.push(0, i, next);
+    }
+    var centerIndex = base + 1;
+    for (var i = 1; i <= base; i++) {
+        var next = i % base + 1;
+        indices.push(centerIndex, next, i);
+    }
+    var vertices = [], texArray = [], normArray = [];
+    verts.forEach(v => vertices.push(...v));
+    texCoords.forEach(tc => texArray.push(...tc));
+    for (let i = 0; i < verts.length; i++) {
+        if (i === 0) {
+            normArray.push(0, 1, 0); 
+        } else if (i === centerIndex) {
+            normArray.push(0, -1, 0); 
+        } else {
+            normArray.push(0, 1, 0); 
+        }
+    }
+
+    model.vertexPositions = new Float32Array(vertices);
+    model.vertexNormals = new Float32Array(normArray);
+    model.vertexTextureCoords = new Float32Array(texArray);
+    model.indices = new Uint8Array(indices);
+    return model;
+}
+
+
+
+function draw() {
+    scale = sliderScale.value(0);
+    rotate = sliderRotate.value(0);
+    translateX = sliderTranslateX.value(0);
+    translateY = sliderTranslateY.value(0);
+    drawTextureCanvas();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (loadingImages) return;
+    var texnum = Number(document.getElementById("texture").value);
+    var objectNumber = Number(document.getElementById("object").value);
+    var image = textureImages[texnum];
+    glEnable(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glMatrixMode(GL_TEXTURE);
+    glLoadIdentity();
+    glTranslatef(translateX, translateY, 0);
+    glRotatef(rotate, 0, 0, 1);
+    glScalef(scale, scale, 1);
+    glMatrixMode(GL_MODELVIEW);
+    camera.apply();
+    switch(objectNumber) {
+        case 0: glRotatef(-90,1,0,0); glScalef(1.5,1.5,1.5); drawModel(sphere); break;
+        case 1: glScalef(1.2,1.2,1.2); drawModel(cubeModel); break;
+        case 2: glRotatef(-90,1,0,0); glScalef(1.3,1.3,1.3); drawModel(cylinder); break;
+        case 3: glRotatef(-90,1,0,0); glScalef(1.3,1.3,1.3); drawModel(cone); break;
+        case 4: glScalef(1.6,1.6,1.6); drawModel(torus); break;
+        case 5: glScalef(0.06, 0.06, 0.06); drawModel(teapot); break;
+        case 6: glScalef(0.8, 0.8, 0.8); drawModel(Pyramid17); break;
+
+    }
+}
+
+function drawTextureCanvas() {
+    if (loadingImages) {
+        graphics.fillStyle = "white";
+        graphics.fillRect(0, 0, 300, 300);
+        graphics.fillStyle = "black";
+        graphics.font = "14px serif";
+        graphics.fillText("Waiting for images to load...", 10, 40);
+        return;
+    }
+    graphics.clearRect(0, 0, 300, 300);
+    graphics.save();
+    graphics.translate(100,200);
+    graphics.scale(1,-1);
+    graphics.translate(translateX*100,translateY*100);
+    graphics.rotate(rotate/180 * Math.PI);
+    graphics.scale(scale,scale);
+    graphics.lineWidth = 5/scale;
+    graphics.strokeStyle = "white";
+    graphics.strokeRect(-.5,-.5,100,100);
+    graphics.lineWidth = 1/scale;
+    graphics.strokeStyle = "black";
+    graphics.strokeRect(-.5,-.5,100,100);
+    graphics.restore();
+}
+
+function drawModel(model) {
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3,GL_FLOAT,0,model.vertexPositions);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glNormalPointer(GL_FLOAT, 0, model.vertexNormals);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2,GL_FLOAT,0,model.vertexTextureCoords);
+    glDrawElements(GL_TRIANGLES, model.indices.length, GL_UNSIGNED_BYTE, model.indices);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);    
+}
+
+function initGL() {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_DEPTH_TEST);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, [1, 1, 1, 1]);
+    glClearColor(0,0,0,1);
+}
+
+function loadImages() {
+    var loadedCt = 0;
+    for (var i = 0; i < textureImageURLs.length; i++) {
+        textureImages[i] = new Image();
+        textureImages[i].onload = imageLoaded;
+        textureImages[i].src = textureImageURLs[i];
+    }
+    function imageLoaded() {
+        loadedCt++;
+        if (loadedCt == textureImageURLs.length) {
+            loadingImages = false;
+            glEnable(GL_TEXTURE_2D);
+            changeTexture();
+            document.getElementById("object").disabled = false;
+            document.getElementById("texture").disabled = false;
+        }
+    }
+}
+
+function changeTexture() {
+    var texnum = Number(document.getElementById("texture").value);
+    document.getElementById("texcanvas").style.backgroundImage = "url('" + textureImageURLs[texnum] + "')";
+    var image = textureImages[texnum];
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,image.width,image.height,0,GL_RGBA,GL_UNSIGNED_BYTE,image);
+    draw();
+}
+
+function doReset() {
+    sliderRotate.setValue(0,0);
+    sliderScale.setValue(0,1);
+    sliderTranslateX.setValue(0,0);
+    sliderTranslateY.setValue(0,0);
+    camera.lookAt(10,7,20);
+    draw();
+}
+
+function init() {
+    try {
+        glsimUse("maincanvas");
+        var texcanvas = document.getElementById("texcanvas");
+        graphics = texcanvas.getContext('2d');
+    } catch (e) {
+        document.getElementById("canvas-holder").innerHTML = "<p><b>Error: " + e + "</b></p>";
+        return;
+    }
+    document.getElementById("reset").onclick = doReset;
+    document.getElementById("object").onchange = draw;
+    document.getElementById("texture").onchange = changeTexture;
+    sliderRotate = new SliderCanvas(document.getElementById("scRotate"));
+    sliderRotate.addSlider({label:"rotate", min:-180, max:180, value:0});
+    sliderScale = new SliderCanvas(document.getElementById("scScale"));
+    sliderScale.addSlider({label:"scale", min: 0.5, max:2, step:0.01, value:1, decimals:2});
+    sliderTranslateX = new SliderCanvas(document.getElementById("scTransX"));
+    sliderTranslateX.addSlider({label:"x-trans.", min: -0.5, max:0.5, step:0.01, value:0, decimals:2});
+    sliderTranslateY = new SliderCanvas(document.getElementById("scTransY"));
+    sliderTranslateY.addSlider({label:"y-trans.", min: -0.5, max:0.5, step:0.01, value:0, decimals:2});
+    sliderRotate.onChange = draw;
+    sliderScale.onChange = draw;
+    sliderTranslateX.onChange = draw;
+    sliderTranslateY.onChange = draw;
+    initGL();
+    camera = new Camera();
+    camera.setScale(1);
+    camera.lookAt(10,7,20);
+    camera.installTrackball(draw);
+    sphere = uvSphere();
+    cubeModel = cube();
+    cylinder = uvCylinder();
+    cone = uvCone();
+    torus = uvTorus();
+    teapot = teapotModel;
+    Pyramid17 = createPyramid17();
+    drawTextureCanvas();
+    loadImages();
+}
+</script>
+</head>
+<body onload="init()">
+<div id="content">
+<h3 id="headline">Textures and Texture Transforms</h3>
+<table border="0" cellspacing="0" cellpadding="8">
+<tr>
+<td><div id="canvas-holder"><canvas id="texcanvas" width="300" height="300"></canvas></div></td>
+<td><canvas id="maincanvas" width="300" height="300"></canvas></td>
+</tr>
+<tr align="center">
+<td colspan="2">
+    <b>Texture:</b>
+    <select id="texture">
+        <option value="0">Brick</option>
+        <option value="1">Topographic Earth</option>
+        <option value="2">Earth At Night</option>
+        <option value="3">Marble</option>
+        <option value="4">Metal</option>
+        <option value="5">Clouds</option>
+    </select>
+    <b style="margin-left:40px">Object</b>:
+    <select id="object">
+        <option value="0">Sphere</option>
+        <option value="1">Cube</option>
+        <option value="2">Cylinder</option>
+        <option value="3">Cone</option>
+        <option value="4">Torus</option>
+        <option value="5">Teapot</option>
+        <option value="6">Pyramid17</option>
+    </select>
+    <button id="reset" style="margin-left:40px">Reset</button>
+</td>
+</tr>
+<tr align=center>
+<td><canvas id="scScale" width="280" height="50"></canvas></td>
+<td><canvas id="scTransX" width="280" height="50"></canvas></td>
+</tr>
+<tr align=center>
+<td><canvas id="scRotate" width="280" height="50"></canvas></td>
+<td><canvas id="scTransY" width="280" height="50"></canvas></td>
+</tr>
+</table>
+</div>
+</body>
+</html>
