@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Karuzela z 17 końmi</title>
+  <script src="three.js-master/build/three.js"></script>
+  <script src="resources/OrbitControls.js"></script>
+  <script src="three.js-master/examples/js/loaders/deprecated/LegacyJSONLoader.js"></script>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+  <script>
+    "use strict";
+
+    let canvas, renderer, scene, camera;
+    let dach1, dach2, tempObject;
+    let controls;
+    let animating = false;
+    let frameNumber = 0;
+    const konie = 17;
+    const boki = 17;
+    const promienKoni = 10;     
+    const promienPodstawy = 12; 
+    let konieArray = [];
+
+    function dodajKonia(x, z, kolor, angle) {
+      const loader = new THREE.LegacyJSONLoader();
+      loader.load('horse.js', function (geometry) {
+        const kon = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({
+          color: kolor,
+          specular: 0x222222,
+          shininess: 12,
+          shading: THREE.FlatShading
+        }));
+        kon.scale.set(0.03, 0.03, 0.03);
+        kon.position.set(x, 0, z);
+        kon.rotation.y = -angle; 
+        scene.add(kon);
+        konieArray.push(kon);
+      });
+    }
+
+    function createWorld() {
+      renderer.setClearColor("gray");
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(30, canvas.width / canvas.height, 0.1, 100);
+      camera.position.z = 50;
+      const light = new THREE.DirectionalLight();
+      light.position.set(0, 0, 1);
+      camera.add(light);
+      scene.add(camera);
+
+      // Podłoże
+      const textureGround = new THREE.TextureLoader().load("paisley.jpg");
+      tempObject = new THREE.Mesh(
+        new THREE.CylinderGeometry(promienPodstawy, promienPodstawy, 0.4, boki),
+        new THREE.MeshBasicMaterial({ map: textureGround })
+      );
+      tempObject.rotation.y = Math.PI / boki;
+      scene.add(tempObject);
+
+      // Dach
+      dach1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, promienPodstawy, 3, 30),
+        new THREE.MeshPhongMaterial({ color: 0x00004c, specular: 0x222222, shininess: 12 })
+      );
+      dach1.position.y = 9.6;
+      dach2 = new THREE.Mesh(
+        new THREE.CylinderGeometry(promienPodstawy, promienPodstawy, 0.3, 200),
+        new THREE.MeshPhongMaterial({ color: 0x00004c, specular: 0x222222, shininess: 12 })
+      );
+      dach2.position.y = 8;
+      scene.add(dach1);
+      scene.add(dach2);
+
+      // Glob
+      var texture = new THREE.TextureLoader().load( 'earth.jpg' ); // Wczytaj teksturę
+      var geometry = new THREE.SphereGeometry( 3.7, 32, 32 ); // Kula o promieniu 3.7
+      var material = new THREE.MeshBasicMaterial( { color: 0xffffff, map: texture } ); // Przypisz materiał
+      var sphere = new THREE.Mesh( geometry, material ); // Stwórz kulę
+      sphere.position.y = 4; // Ustaw pozycję na y = 4
+      scene.add( sphere ); // Dodaj kulę do sceny
+
+
+      const kolory = [0x006400, 0xFFFFFF, 0x964B00];
+
+      for (let i = 0; i < konie; i++) {
+        const angle = (2 * Math.PI / konie) * i;
+        const x = Math.cos(angle) * promienKoni;
+        const z = Math.sin(angle) * promienKoni;
+        const kolor = kolory[i % kolory.length];
+
+        // Słup
+        const slup = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.3, 0.3, 8, 30),
+          new THREE.MeshPhongMaterial({ color: 0x654321, specular: 0x222222, shininess: 12 })
+        );
+        slup.position.set(x, 3.9, z);
+        scene.add(slup);
+
+        // Koń
+        dodajKonia(x, z, kolor, angle);
+      }
+    }
+
+    function updateForFrame() {
+      frameNumber++;
+      tempObject.rotation.y += 0.01;
+      dach1.rotation.y += 0.01;
+      dach2.rotation.y += 0.01;
+
+      const animhorse = new THREE.Object3D();
+      konieArray.forEach(kon => animhorse.add(kon));
+      animhorse.rotation.y = frameNumber * 0.01;
+      scene.add(animhorse);
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+
+    function doFrame() {
+      if (animating) {
+        updateForFrame();
+        render();
+        requestAnimationFrame(doFrame);
+      }
+    }
+
+    function doAnimateCheckbox() {
+      animating = document.getElementById("animateCheckbox").checked;
+      if (animating) {
+        requestAnimationFrame(doFrame);
+      }
+    }
+
+    function installOrbitControls() {
+      controls = new THREE.OrbitControls(camera, canvas);
+      controls.noPan = true;
+      controls.noZoom = true;
+      controls.staticMoving = true;
+
+      canvas.addEventListener("mousedown", () => {
+        document.addEventListener("mousemove", () => {
+          controls.update();
+          if (!animating) render();
+        });
+      });
+
+      canvas.addEventListener("touchmove", (e) => {
+        if (e.touches.length == 1) render();
+      });
+    }
+
+    function init() {
+      try {
+        canvas = document.getElementById("glcanvas");
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      } catch (e) {
+        document.getElementById("message").innerHTML = "<b>Błąd: " + e + "</b>";
+        return;
+      }
+      document.getElementById("animateCheckbox").onchange = doAnimateCheckbox;
+      createWorld();
+      installOrbitControls();
+      render();
+    }
+  </script>
+</head>
+<body onload="init()">
+
+  <h2>Karuzela z 6 końmi (Three.js)</h2>
+
+  <p id="message" style="color:#AA0000;"></p>
+  <p>
+    <label><input type="checkbox" id="animateCheckbox"><b>Animacja</b></label>
+    <b style="margin-left:50px">Obracaj scenę myszką.</b>
+  </p>
+
+  <div style="border: thin solid black; background-color: white">
+    <canvas width="1200" height="600" id="glcanvas"></canvas>
+  </div>
+
+</body>
+</html>
